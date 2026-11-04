@@ -1,0 +1,43 @@
+name: Obfuscate and Deploy
+
+on:
+  push:
+    branches: [ main ]        # 推到 main 时触发
+  workflow_dispatch:          # 也支持手动触发
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+
+      - name: Install deps
+        run: npm ci            # 或 npm install
+
+      # 核心：混淆 JS 代码
+      - name: Obfuscate _worker.js
+        run: |
+          npx javascript-obfuscator src/_worker.js \
+            --output dist/_worker.js \
+            --compact true \
+            --self-defending true \
+            --string-array true \
+            --string-array-encoding 'base64' \
+            --string-array-threshold 1
+          # 若混淆多个文件：npx javascript-obfuscator src --output dist --recursive true
+
+      # 可选：部署到 Cloudflare Pages
+      - name: Deploy to Cloudflare Pages
+        uses: cloudflare/pages-action@v1
+        with:
+          apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          projectName: 你的项目名
+          directory: dist
+          wranglerVersion: '3'
